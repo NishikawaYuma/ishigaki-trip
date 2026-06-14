@@ -48,17 +48,17 @@ export default function Home() {
           <CalendarDays size={16} />
           <span>2026年6月24日（水）〜 6月28日（日）</span>
         </div>
-        <p className="mt-2 text-gray-400 text-xs">5日間 / 石垣島・竹富島</p>
+        <p className="mt-2 text-gray-400 text-xs">5日間 / 竹富島・石垣島・西表島</p>
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-6 shadow-sm">
         <h2 className="text-sm font-semibold text-gray-600 mb-2">旅行概要</h2>
-        <ul className="text-sm text-gray-700 space-y-1">
-          <li>📅 6/24 石垣島着・市街地散策</li>
-          <li>🌊 6/25 川平湾グラスボート・米原ビーチ</li>
-          <li>🏝 6/26 竹富島 or 西表島</li>
-          <li>🤿 6/27 ダイビング or フリー</li>
-          <li>✈️ 6/28 帰宅</li>
+        <ul className="text-sm text-gray-700 space-y-1.5">
+          <li>✈️ 6/24（水）関西空港発 → 竹富島へ。高那旅館泊</li>
+          <li>⛵ 6/25（木）竹富島散策 → 石垣島へ移動・川平湾ドライブ</li>
+          <li>🤿 6/26（金）青の洞窟シュノーケリング・川平湾ドライブ</li>
+          <li>🌴 6/27（土）西表島アクティビティ・石垣島観光</li>
+          <li>🛫 6/28（日）石垣空港発 → 関西空港着</li>
         </ul>
       </div>
 
