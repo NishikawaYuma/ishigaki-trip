@@ -1,16 +1,34 @@
-import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import type { Metadata, Viewport } from "next";
+import { Noto_Sans_JP, Zen_Maru_Gothic } from "next/font/google";
 import "./globals.css";
 import BottomNav from "./components/BottomNav";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const notoSans = Noto_Sans_JP({
   subsets: ["latin"],
+  weight: ["400", "500", "700", "900"],
+  variable: "--font-noto",
+  display: "swap",
+});
+
+const zenMaru = Zen_Maru_Gothic({
+  subsets: ["latin"],
+  weight: ["500", "700", "900"],
+  variable: "--font-zen",
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "石垣島旅のしおり",
+  title: "石垣島 旅のしおり",
   description: "2026年6月 石垣島旅行のしおりアプリ",
+};
+
+/* ★ viewport を明示。width=device-width / initial-scale=1 / viewport-fit=cover。
+   入力欄16px化（globals.css）と合わせて、文字入力時の勝手な拡大を防ぐ。 */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#FFF6E9",
 };
 
 export default function RootLayout({
@@ -19,8 +37,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ja" className={`${geistSans.variable} h-full antialiased`}>
-      <body className="min-h-full bg-gray-50 text-gray-800 pb-16">
+    <html
+      lang="ja"
+      className={`${notoSans.variable} ${zenMaru.variable} h-full antialiased`}
+    >
+      <body className="min-h-full pb-20">
         {children}
         <BottomNav />
       </body>

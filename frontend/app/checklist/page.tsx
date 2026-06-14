@@ -1,12 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { CheckSquare, Square } from "lucide-react";
+import { CheckSquare, Square, Plus, Trash2 } from "lucide-react";
 
 type Item = { id: string; label: string };
 type Category = { name: string; emoji: string; items: Item[] };
 
-const categories: Category[] = [
+const baseCategories: Category[] = [
   {
     name: "衣類",
     emoji: "👕",
@@ -64,99 +64,169 @@ const categories: Category[] = [
   },
 ];
 
-const STORAGE_KEY = "ishigaki-checklist";
+const CHECK_KEY = "ishigaki-checklist";
+const CUSTOM_KEY = "ishigaki-checklist-custom";
+const cardShadow = "0 1px 3px rgba(23,58,71,.06)";
 
 export default function ChecklistPage() {
-  const allIds = categories.flatMap((c) => c.items.map((i) => i.id));
   const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [custom, setCustom] = useState<Record<string, Item[]>>({});
   const [mounted, setMounted] = useState(false);
+  const [addingIn, setAddingIn] = useState<string | null>(null);
+  const [newLabel, setNewLabel] = useState("");
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
+    const c = localStorage.getItem(CHECK_KEY);
+    if (c) {
       try {
-        setChecked(new Set(JSON.parse(saved)));
-      } catch {
-        // ignore parse errors
-      }
+        setChecked(new Set(JSON.parse(c)));
+      } catch {}
+    }
+    const cu = localStorage.getItem(CUSTOM_KEY);
+    if (cu) {
+      try {
+        setCustom(JSON.parse(cu));
+      } catch {}
     }
     setMounted(true);
   }, []);
 
-  const toggle = (id: string) => {
+  const persistChecked = (s: Set<string>) => localStorage.setItem(CHECK_KEY, JSON.stringify([...s]));
+  const persistCustom = (c: Record<string, Item[]>) => localStorage.setItem(CUSTOM_KEY, JSON.stringify(c));
+
+  const toggle = (id: string) =>
     setChecked((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify([...next]));
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      persistChecked(next);
       return next;
     });
+
+  const itemsFor = (name: string, base: Item[]) => [...base, ...(custom[name] ?? [])];
+
+  const addItem = (name: string) => {
+    if (!newLabel.trim()) return;
+    const item: Item = { id: "x-" + Math.random().toString(36).slice(2, 9), label: newLabel.trim() };
+    const updated = { ...custom, [name]: [...(custom[name] ?? []), item] };
+    setCustom(updated);
+    persistCustom(updated);
+    setNewLabel("");
+    setAddingIn(null);
   };
 
-  const checkedCount = checked.size;
+  const removeCustom = (name: string, id: string) => {
+    const updated = { ...custom, [name]: (custom[name] ?? []).filter((i) => i.id !== id) };
+    setCustom(updated);
+    persistCustom(updated);
+  };
+
+  const allIds = baseCategories.flatMap((c) => itemsFor(c.name, c.items).map((i) => i.id));
   const totalCount = allIds.length;
+  const checkedCount = mounted ? allIds.filter((id) => checked.has(id)).length : 0;
+  const pct = totalCount ? Math.round((checkedCount / totalCount) * 100) : 0;
 
   return (
-    <main className="max-w-md mx-auto px-4 py-6">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-xl font-bold text-gray-800">持ち物</h1>
-        <span className="text-sm text-gray-500">
-          {mounted ? `${checkedCount} / ${totalCount}` : `0 / ${totalCount}`}
+    <main className="max-w-md mx-auto px-4 py-5">
+      <div className="flex items-center justify-between mb-2.5">
+        <h1 className="font-display font-bold text-xl">持ち物</h1>
+        <span className="text-[13px] font-bold font-mono" style={{ color: "var(--sun-deep)" }}>
+          {checkedCount} / {totalCount}
         </span>
       </div>
 
       {/* 進捗バー */}
-      <div className="w-full bg-gray-200 rounded-full h-2 mb-6">
-        <div
-          className="bg-orange-400 h-2 rounded-full transition-all duration-300"
-          style={{ width: mounted ? `${(checkedCount / totalCount) * 100}%` : "0%" }}
-        />
+      <div className="w-full h-2.5 rounded-full overflow-hidden mb-5" style={{ background: "var(--sand-200)" }}>
+        <div className="h-full rounded-full transition-all duration-300" style={{ width: `${pct}%`, background: "var(--sun)" }} />
       </div>
 
-      <div className="space-y-4">
-        {categories.map((cat) => (
-          <div
-            key={cat.name}
-            className="bg-white rounded-2xl border border-gray-200 p-4 shadow-sm"
-          >
-            <h2 className="text-sm font-semibold text-gray-700 mb-3">
-              {cat.emoji} {cat.name}
-            </h2>
-            <ul className="space-y-2">
-              {cat.items.map((item) => {
-                const isChecked = mounted && checked.has(item.id);
-                return (
-                  <li key={item.id}>
-                    <button
-                      onClick={() => toggle(item.id)}
-                      className="flex items-center gap-2.5 w-full text-left"
-                    >
-                      {isChecked ? (
-                        <CheckSquare size={18} className="text-orange-400 flex-shrink-0" />
-                      ) : (
-                        <Square size={18} className="text-gray-300 flex-shrink-0" />
+      <div className="flex flex-col gap-3">
+        {baseCategories.map((cat) => {
+          const items = itemsFor(cat.name, cat.items);
+          const customIds = new Set((custom[cat.name] ?? []).map((i) => i.id));
+          const isAdding = addingIn === cat.name;
+
+          return (
+            <div key={cat.name} className="bg-white rounded-[22px] border p-4" style={{ borderColor: "var(--sand-200)", boxShadow: cardShadow }}>
+              <h2 className="text-[14px] font-bold mb-3">
+                {cat.emoji} {cat.name}
+              </h2>
+              <ul className="space-y-2.5">
+                {items.map((item) => {
+                  const isChecked = mounted && checked.has(item.id);
+                  const isCustom = customIds.has(item.id);
+                  return (
+                    <li key={item.id} className="flex items-center gap-2.5">
+                      <button onClick={() => toggle(item.id)} className="flex items-center gap-2.5 flex-1 text-left">
+                        {isChecked ? (
+                          <CheckSquare size={19} style={{ color: "var(--sun-deep)" }} className="flex-shrink-0" />
+                        ) : (
+                          <Square size={19} style={{ color: "var(--sand-300)" }} className="flex-shrink-0" />
+                        )}
+                        <span
+                          className="text-[13.5px] leading-tight"
+                          style={isChecked ? { textDecoration: "line-through", color: "var(--ink-300)" } : { color: "var(--ink-700)" }}
+                        >
+                          {item.label}
+                        </span>
+                      </button>
+                      {isCustom && (
+                        <button onClick={() => removeCustom(cat.name, item.id)} style={{ color: "var(--ink-300)" }} aria-label="削除">
+                          <Trash2 size={13} />
+                        </button>
                       )}
-                      <span
-                        className={`text-sm leading-tight ${
-                          isChecked ? "line-through text-gray-400" : "text-gray-700"
-                        }`}
-                      >
-                        {item.label}
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
+                    </li>
+                  );
+                })}
+              </ul>
+
+              {/* ★ 追加: カテゴリごとに持ち物を追加できる */}
+              {isAdding ? (
+                <div className="mt-3 flex gap-2">
+                  <input
+                    autoFocus
+                    type="text"
+                    value={newLabel}
+                    onChange={(e) => setNewLabel(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") addItem(cat.name);
+                      if (e.key === "Escape") {
+                        setAddingIn(null);
+                        setNewLabel("");
+                      }
+                    }}
+                    placeholder="持ち物を入力"
+                    className="flex-1 min-w-0 border rounded-lg px-3 py-2 outline-none"
+                    style={{ borderColor: "var(--sand-300)", fontSize: 16 }}
+                  />
+                  <button onClick={() => addItem(cat.name)} disabled={!newLabel.trim()} className="text-[13px] text-white px-4 rounded-lg disabled:opacity-40" style={{ background: "var(--sun-deep)" }}>
+                    追加
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => {
+                    setAddingIn(cat.name);
+                    setNewLabel("");
+                  }}
+                  className="mt-3 w-full flex items-center justify-center gap-1 py-2 text-[13px] font-semibold rounded-lg"
+                  style={{ color: "var(--sun-deep)", background: "var(--sand-50)" }}
+                >
+                  <Plus size={14} /> 持ち物を追加
+                </button>
+              )}
+            </div>
+          );
+        })}
       </div>
 
       <button
         onClick={() => {
           setChecked(new Set());
-          localStorage.removeItem(STORAGE_KEY);
+          localStorage.removeItem(CHECK_KEY);
         }}
-        className="mt-6 w-full text-xs text-gray-400 hover:text-gray-600 py-2"
+        className="mt-6 w-full text-[12px] py-2"
+        style={{ color: "var(--ink-400)" }}
       >
         チェックをすべてリセット
       </button>

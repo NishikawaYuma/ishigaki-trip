@@ -1,26 +1,71 @@
 @import "tailwindcss";
 
+/* ============================================================
+   石垣島 旅のしおり — Design System "海と空 / Umi to Sora"
+   カラーはすべてここ（:root）に集約。微調整はこの値を変えるだけ。
+   ============================================================ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* 海と空 */
+  --sea: #0E9FD6;
+  --sea-deep: #0B6E9B;
+  --sea-ink: #0A4A66;
+  --lagoon: #14B8A6;
+  --lagoon-deep: #0E9485;
+
+  /* ポップアクセント */
+  --coral: #FF6F5E;
+  --coral-deep: #E8513F;
+  --sun: #FFC23C;
+  --sun-deep: #F0A613;
+
+  /* 砂（暖色ニュートラル） */
+  --sand-50: #FFFBF4;
+  --sand-100: #FFF6E9;
+  --sand-150: #FBEFDD;
+  --sand-200: #F2E6D2;
+  --sand-300: #E4D6BD;
+
+  /* 墨（純黒は使わない） */
+  --ink: #173A47;
+  --ink-700: #2C5260;
+  --ink-500: #5E7B86;
+  --ink-400: #8AA0A9;
+  --ink-300: #B4C4CB;
+
+  --background: #FFF6E9;
+  --foreground: #173A47;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+/* ★ ダークモード反転は撤去（黒背景・白抜きの原因だった）。常に明るいテーマで固定。 */
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  -webkit-text-size-adjust: 100%;
 }
 
 body {
-  background: var(--background);
+  background:
+    radial-gradient(1200px 600px at 80% -10%, rgba(20, 184, 166, 0.10), transparent 60%),
+    radial-gradient(1000px 500px at 0% 0%, rgba(14, 159, 214, 0.10), transparent 55%),
+    var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-noto), "Noto Sans JP", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
+
+/* ★ iOS Safari は 16px 未満の入力欄でフォーカス時に自動ズームする。
+   すべての入力を 16px 以上にして自動ズームを無効化。 */
+input,
+textarea,
+select {
+  font-size: 16px;
+}
+
+/* 見出し用の丸ゴシック（next/font で読み込んだ変数を使用） */
+.font-display {
+  font-family: var(--font-zen), "Zen Maru Gothic", "Noto Sans JP", sans-serif;
+}
+
+/* スクロールバー非表示（横スクロールのデイタブなどに使用） */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }

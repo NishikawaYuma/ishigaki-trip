@@ -5,6 +5,7 @@ import { tripData } from "../data/spots";
 import { ChevronDown, ChevronUp, ExternalLink, Pencil } from "lucide-react";
 
 const STORAGE_KEY = "ishigaki-custom-times";
+const cardShadow = "0 1px 3px rgba(23,58,71,.06)";
 
 export default function ItineraryPage() {
   const [selectedDay, setSelectedDay] = useState(0);
@@ -47,110 +48,121 @@ export default function ItineraryPage() {
   const day = tripData[selectedDay];
 
   return (
-    <main className="max-w-md mx-auto px-4 py-6 pb-24">
-      {/* Day tabs */}
-      <div className="flex gap-1.5 mb-6 overflow-x-auto pb-1">
+    <main className="max-w-md mx-auto px-4 py-5">
+      <h1 className="font-display font-bold text-xl mb-3">旅程</h1>
+
+      {/* デイタブ */}
+      <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
         {tripData.map((d, i) => (
           <button
             key={d.date}
             onClick={() => setSelectedDay(i)}
-            className={`flex-shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+            className="flex-shrink-0 px-3.5 py-1.5 rounded-full text-[13px] font-bold transition-colors"
+            style={
               selectedDay === i
-                ? "bg-sky-500 text-white"
-                : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
+                ? { background: "var(--sea)", color: "#fff" }
+                : { background: "var(--sand-150)", color: "var(--ink-700)" }
+            }
           >
             {i + 1}日目
           </button>
         ))}
       </div>
 
-      <p className="text-sm text-gray-400 font-medium mb-3">{day.label}</p>
+      <p className="text-[12px] font-semibold mt-3 mb-3" style={{ color: "var(--ink-500)" }}>{day.label}</p>
 
-      <div className="space-y-2.5">
+      {/* タイムライン */}
+      <div className="relative pl-5">
+        <div className="absolute left-[5px] top-2 bottom-2 w-0.5" style={{ background: "var(--sand-200)" }} />
         {day.schedules.map((item) => {
           const displayTime = customTimes[item.id] ?? item.time;
           const isEditing = editingId === item.id;
           const linksOpen = expandedLinks.has(item.id);
 
           return (
-            <div
-              key={item.id}
-              className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
-            >
-              <div className="flex items-start gap-3 px-4 py-3">
-                {/* Time */}
-                <div className="w-[76px] flex-shrink-0 pt-0.5">
-                  {item.editable ? (
-                    isEditing ? (
-                      <input
-                        autoFocus
-                        value={editValue}
-                        onChange={(e) => setEditValue(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") saveEdit(item.id);
-                          if (e.key === "Escape") setEditingId(null);
-                        }}
-                        onBlur={() => saveEdit(item.id)}
-                        placeholder="例: 14:00"
-                        className="w-full text-xs border border-sky-300 rounded px-1.5 py-0.5 outline-none text-gray-700"
-                      />
+            <div key={item.id} className="relative mb-2.5">
+              <div
+                className="absolute w-[11px] h-[11px] rounded-full"
+                style={{ left: -19, top: 6, background: "var(--sea)", boxShadow: "0 0 0 3px #fff" }}
+              />
+              <div
+                className="bg-white rounded-[18px] border overflow-hidden"
+                style={{ borderColor: "var(--sand-200)", boxShadow: cardShadow }}
+              >
+                <div className="px-4 py-3">
+                  {/* 時刻 */}
+                  <div>
+                    {item.editable ? (
+                      isEditing ? (
+                        <input
+                          autoFocus
+                          value={editValue}
+                          onChange={(e) => setEditValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") saveEdit(item.id);
+                            if (e.key === "Escape") setEditingId(null);
+                          }}
+                          onBlur={() => saveEdit(item.id)}
+                          placeholder="例: 14:00"
+                          className="w-28 border rounded px-2 py-0.5 outline-none"
+                          style={{ borderColor: "var(--sea)", fontSize: 16 }}
+                        />
+                      ) : (
+                        <button
+                          onClick={() => startEdit(item.id, displayTime)}
+                          className="flex items-center gap-1 text-[13px] font-semibold"
+                          style={{ color: "var(--sea-deep)" }}
+                        >
+                          <span className="font-mono">{displayTime}</span>
+                          <Pencil size={11} />
+                        </button>
+                      )
                     ) : (
-                      <button
-                        onClick={() => startEdit(item.id, displayTime)}
-                        className="flex items-center gap-1 text-xs text-sky-500 font-medium hover:text-sky-700"
-                      >
-                        <span>{displayTime}</span>
-                        <Pencil size={9} />
-                      </button>
-                    )
-                  ) : (
-                    <span className="text-xs text-gray-400 font-medium">{displayTime}</span>
-                  )}
-                </div>
+                      <span className="text-[13px] font-semibold font-mono" style={{ color: "var(--sea-deep)" }}>
+                        {displayTime}
+                      </span>
+                    )}
+                  </div>
 
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-800 leading-tight">
-                    {item.title}
-                  </p>
+                  <p className="font-bold text-[14.5px] mt-1.5 leading-tight">{item.title}</p>
                   {item.comment && (
-                    <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">
+                    <p className="text-[12px] mt-1 leading-relaxed" style={{ color: "var(--ink-500)" }}>
                       {item.comment}
                     </p>
                   )}
                 </div>
-              </div>
 
-              {/* Expandable links */}
-              {item.links && item.links.length > 0 && (
-                <div className="border-t border-gray-50">
-                  <button
-                    onClick={() => toggleLinks(item.id)}
-                    className="w-full flex items-center justify-between px-4 py-2 text-xs text-sky-500 hover:bg-gray-50 transition-colors"
-                  >
-                    <span>時刻表・リンクを見る</span>
-                    {linksOpen ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-                  </button>
-                  {linksOpen && (
-                    <ul className="px-4 pb-3 space-y-2">
-                      {item.links.map((link) => (
-                        <li key={link.label}>
-                          <a
-                            href={link.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1.5 text-xs text-sky-600 hover:underline"
-                          >
-                            <ExternalLink size={11} />
-                            {link.label}
-                          </a>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
+                {item.links && item.links.length > 0 && (
+                  <div className="border-t" style={{ borderColor: "var(--sand-150)" }}>
+                    <button
+                      onClick={() => toggleLinks(item.id)}
+                      className="w-full flex items-center justify-between px-4 py-2 text-[12px] font-semibold"
+                      style={{ color: "var(--sea-deep)" }}
+                    >
+                      <span>時刻表・リンクを見る</span>
+                      {linksOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    </button>
+                    {linksOpen && (
+                      <ul className="px-4 pb-3 space-y-2">
+                        {item.links.map((link) => (
+                          <li key={link.label}>
+                            <a
+                              href={link.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1.5 text-[12px]"
+                              style={{ color: "var(--sea-deep)" }}
+                            >
+                              <ExternalLink size={12} />
+                              {link.label}
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           );
         })}
