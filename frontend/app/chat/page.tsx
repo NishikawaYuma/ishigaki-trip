@@ -1,6 +1,6 @@
 "use client";
 
-import { Bot, Send, User } from "lucide-react";
+import { Send, User } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 type Message = {
@@ -23,14 +23,104 @@ function genId() {
   return Math.random().toString(36).slice(2, 9);
 }
 
+// ---- Markdown renderer (no external lib) ----
+
+function renderInline(text: string) {
+  const parts = text.split(/(\*\*[^*\n]+\*\*)/);
+  return parts.map((part, i) =>
+    part.startsWith("**") && part.endsWith("**") ? (
+      <strong key={i} className="font-semibold">
+        {part.slice(2, -2)}
+      </strong>
+    ) : (
+      part
+    )
+  );
+}
+
+function MarkdownText({ content }: { content: string }) {
+  const blocks = content.split(/\n{2,}/);
+
+  return (
+    <div className="space-y-1.5">
+      {blocks.map((block, bi) => {
+        const lines = block.split("\n").filter((l) => l.trim() !== "");
+        if (!lines.length) return null;
+
+        const isItem = (l: string) => /^\s*[-*] /.test(l);
+        const isNumItem = (l: string) => /^\s*\d+\. /.test(l);
+
+        // Block with list items (may be mixed with plain lines)
+        if (lines.some(isItem) || lines.some(isNumItem)) {
+          const nodes: React.ReactNode[] = [];
+          let buf: string[] = [];
+          let listType: "ul" | "ol" | null = null;
+
+          const flushList = () => {
+            if (!buf.length) return;
+            if (listType === "ul") {
+              nodes.push(
+                <ul key={nodes.length} className="list-disc pl-4 space-y-0.5">
+                  {buf.map((l, i) => (
+                    <li key={i}>{renderInline(l.replace(/^\s*[-*] /, ""))}</li>
+                  ))}
+                </ul>
+              );
+            } else {
+              nodes.push(
+                <ol key={nodes.length} className="list-decimal pl-4 space-y-0.5">
+                  {buf.map((l, i) => (
+                    <li key={i}>{renderInline(l.replace(/^\s*\d+\. /, ""))}</li>
+                  ))}
+                </ol>
+              );
+            }
+            buf = [];
+            listType = null;
+          };
+
+          for (const line of lines) {
+            if (isItem(line)) {
+              if (listType && listType !== "ul") flushList();
+              listType = "ul";
+              buf.push(line);
+            } else if (isNumItem(line)) {
+              if (listType && listType !== "ol") flushList();
+              listType = "ol";
+              buf.push(line);
+            } else {
+              flushList();
+              nodes.push(<p key={nodes.length}>{renderInline(line)}</p>);
+            }
+          }
+          flushList();
+          return <div key={bi}>{nodes}</div>;
+        }
+
+        // Plain paragraph
+        return (
+          <p key={bi}>
+            {lines.flatMap((l, i) => [
+              ...(i > 0 ? [<br key={`br-${bi}-${i}`} />] : []),
+              ...renderInline(l),
+            ])}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---- Chat page ----
+
 export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
+  const [streaming, setStreaming] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  /* localStorage から会話を復元 */
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
@@ -52,7 +142,7 @@ export default function ChatPage() {
 
   const sendMessage = async (text?: string) => {
     const content = (text ?? input).trim();
-    if (!content || loading) return;
+    if (!content || loading || streaming) return;
     setInput("");
 
     const userMsg: Message = { id: genId(), role: "user", content };
@@ -61,20 +151,66 @@ export default function ChatPage() {
     persist(next);
     setLoading(true);
 
+    const history = next.map(({ role, content: c }) => ({
+      role: role === "assistant" ? "model" : role,
+      content: c,
+    }));
+
+    const aiMsgId = genId();
+
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: content }),
+        body: JSON.stringify({ history }),
       });
-      const data = await res.json();
-      const aiMsg: Message = {
-        id: genId(),
-        role: "assistant",
-        content: data.reply ?? "すみにゃん、うまく答えられなかったにゃ🐾",
-      };
-      const final = [...next, aiMsg];
-      setMessages(final);
+
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+
+      setLoading(false);
+      setStreaming(true);
+      setMessages([...next, { id: aiMsgId, role: "assistant", content: "" }]);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulated = "";
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split("\n\n");
+        buffer = events.pop() ?? "";
+
+        for (const event of events) {
+          if (event.startsWith("event: error")) {
+            accumulated = "すみにゃん、うまく答えられなかったにゃ🐾";
+            continue;
+          }
+          for (const line of event.split("\n")) {
+            if (line.startsWith("data: ")) {
+              try {
+                accumulated += JSON.parse(line.slice(6)) as string;
+              } catch {}
+            }
+          }
+        }
+
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === aiMsgId ? { ...m, content: accumulated } : m
+          )
+        );
+      }
+
+      const finalContent =
+        accumulated || "すみにゃん、うまく答えられなかったにゃ🐾";
+      const final: Message[] = [
+        ...next,
+        { id: aiMsgId, role: "assistant", content: finalContent },
+      ];
       persist(final);
     } catch {
       const errMsg: Message = {
@@ -87,6 +223,7 @@ export default function ChatPage() {
       persist(final);
     } finally {
       setLoading(false);
+      setStreaming(false);
       inputRef.current?.focus();
     }
   };
@@ -151,7 +288,7 @@ export default function ChatPage() {
             >
               こんにちは！いしがき ねこガイドだにゃ 🐱🌊
               <br />
-              川平湾へのアクセス・グルメ・天気・おすすめアクティビティなど、旅の疑問はなんでも聞いてにゃ！
+              旅の疑問はもちろん、なんでも気軽に聞いてにゃ！
             </div>
           </div>
         )}
@@ -208,13 +345,13 @@ export default function ChatPage() {
                   border: "1px solid var(--sand-200)",
                 }}
               >
-                {msg.content}
+                <MarkdownText content={msg.content} />
               </div>
             </div>
           )
         )}
 
-        {/* ローディング */}
+        {/* ローディング（最初のチャンクが届くまで） */}
         {loading && (
           <div className="flex gap-2.5 items-start">
             <div
@@ -247,9 +384,7 @@ export default function ChatPage() {
         <div ref={bottomRef} />
       </div>
 
-      {/* 入力欄
-          ★ font-size: 16px (globals.css で全 input に適用) で iOS の自動ズームを防止。
-          さらに念のため style 直指定も入れる。 */}
+      {/* 入力欄 */}
       <div
         className="flex-shrink-0 flex gap-2.5 items-center px-4 py-3 border-t"
         style={{ background: "#fff", borderColor: "var(--sand-200)" }}
@@ -259,7 +394,9 @@ export default function ChatPage() {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && sendMessage()}
+          onKeyDown={(e) =>
+            e.key === "Enter" && !e.nativeEvent.isComposing && sendMessage()
+          }
           placeholder="ねこガイドに質問…"
           className="flex-1 min-w-0 rounded-[16px] px-4 py-2.5 outline-none border"
           style={{
@@ -277,7 +414,7 @@ export default function ChatPage() {
         />
         <button
           onClick={() => sendMessage()}
-          disabled={!input.trim() || loading}
+          disabled={!input.trim() || loading || streaming}
           className="w-10 h-10 rounded-full flex items-center justify-center text-white flex-shrink-0 transition-opacity disabled:opacity-40"
           style={{ background: "var(--lagoon)" }}
           aria-label="送信"

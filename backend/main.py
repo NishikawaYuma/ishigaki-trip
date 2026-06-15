@@ -1,9 +1,12 @@
+import json
 import os
 from pathlib import Path
+from typing import Generator
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from google import genai
 from google.genai import types
 from pydantic import BaseModel
@@ -26,12 +29,33 @@ _SYSTEM_PROMPT = (
 _client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
 
+class MessageItem(BaseModel):
+    role: str  # "user" or "model"
+    content: str
+
+
 class ChatRequest(BaseModel):
-    message: str
+    history: list[MessageItem]
 
 
-class ChatResponse(BaseModel):
-    reply: str
+def _stream_chat(history: list[MessageItem]) -> Generator[str, None, None]:
+    contents = [
+        types.Content(role=msg.role, parts=[types.Part(text=msg.content)])
+        for msg in history
+    ]
+    try:
+        for chunk in _client.models.generate_content_stream(
+            model="gemini-2.5-flash",
+            contents=contents,
+            config=types.GenerateContentConfig(
+                system_instruction=_SYSTEM_PROMPT,
+                tools=[types.Tool(google_search=types.GoogleSearch())],
+            ),
+        ):
+            if chunk.text:
+                yield f"data: {json.dumps(chunk.text)}\n\n"
+    except Exception as e:
+        yield f"event: error\ndata: {json.dumps(str(e))}\n\n"
 
 
 @app.get("/health")
@@ -39,16 +63,10 @@ def health():
     return {"status": "ok"}
 
 
-@app.post("/chat", response_model=ChatResponse)
-async def chat(request: ChatRequest):
-    try:
-        response = _client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=request.message,
-            config=types.GenerateContentConfig(
-                system_instruction=_SYSTEM_PROMPT,
-            ),
-        )
-        return ChatResponse(reply=response.text)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+@app.post("/chat")
+def chat(request: ChatRequest):
+    return StreamingResponse(
+        _stream_chat(request.history),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
