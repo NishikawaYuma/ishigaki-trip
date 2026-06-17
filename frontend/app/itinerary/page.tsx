@@ -11,17 +11,41 @@ export default function ItineraryPage() {
   const [selectedDay, setSelectedDay] = useState(0);
   const [expandedLinks, setExpandedLinks] = useState<Set<string>>(new Set());
   const [customTimes, setCustomTimes] = useState<Record<string, string>>({});
+  const [loaded, setLoaded] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
 
+  // マウント時に API から読み込み、失敗時は localStorage にフォールバック
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        setCustomTimes(JSON.parse(saved));
-      } catch {}
-    }
+    fetch("/api/data/itinerary")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && Object.keys(data).length > 0) {
+          setCustomTimes(data.customTimes ?? {});
+        } else {
+          const saved = localStorage.getItem(STORAGE_KEY);
+          if (saved) { try { setCustomTimes(JSON.parse(saved)); } catch {} }
+        }
+        setLoaded(true);
+      })
+      .catch(() => {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) { try { setCustomTimes(JSON.parse(saved)); } catch {} }
+        setLoaded(true);
+      });
   }, []);
+
+  // 状態変更時に API へ保存、失敗時は localStorage にフォールバック
+  useEffect(() => {
+    if (!loaded) return;
+    fetch("/api/data/itinerary", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ customTimes }),
+    }).catch(() => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(customTimes));
+    });
+  }, [loaded, customTimes]);
 
   const startEdit = (id: string, currentTime: string) => {
     setEditingId(id);
@@ -30,9 +54,7 @@ export default function ItineraryPage() {
 
   const saveEdit = (id: string) => {
     const value = editValue.trim() || "未定";
-    const updated = { ...customTimes, [id]: value };
-    setCustomTimes(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    setCustomTimes((prev) => ({ ...prev, [id]: value }));
     setEditingId(null);
   };
 

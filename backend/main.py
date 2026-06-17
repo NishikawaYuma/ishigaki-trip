@@ -1,14 +1,15 @@
 import json
 import os
 from pathlib import Path
-from typing import Generator
+from typing import Any, Generator
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from google import genai
 from google.genai import types
+from google.cloud import firestore
 from pydantic import BaseModel
 
 load_dotenv()
@@ -56,6 +57,33 @@ def _stream_chat(history: list[MessageItem]) -> Generator[str, None, None]:
                 yield f"data: {json.dumps(chunk.text)}\n\n"
     except Exception as e:
         yield f"event: error\ndata: {json.dumps(str(e))}\n\n"
+
+
+_db: firestore.Client | None = None
+
+def get_db() -> firestore.Client:
+    global _db
+    if _db is None:
+        _db = firestore.Client()
+    return _db
+
+_ALLOWED_KEYS = {"checklist", "budget", "itinerary"}
+
+
+@app.get("/data/{key}")
+async def get_data(key: str):
+    if key not in _ALLOWED_KEYS:
+        raise HTTPException(status_code=400, detail="invalid key")
+    doc = get_db().collection("trip-state").document(key).get()
+    return doc.to_dict() or {}
+
+
+@app.post("/data/{key}")
+async def set_data(key: str, data: dict[str, Any]):
+    if key not in _ALLOWED_KEYS:
+        raise HTTPException(status_code=400, detail="invalid key")
+    get_db().collection("trip-state").document(key).set(data)
+    return {"ok": True}
 
 
 @app.get("/health")

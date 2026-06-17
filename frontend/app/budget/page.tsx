@@ -18,6 +18,7 @@ function formatYen(amount: number) {
 
 export default function BudgetPage() {
   const [categories, setCategories] = useState<BudgetCategory[]>(initialBudget);
+  const [loaded, setLoaded] = useState(false);
   const [addingIn, setAddingIn] = useState<string | null>(null);
   const [newLabel, setNewLabel] = useState("");
   const [newAmount, setNewAmount] = useState("");
@@ -25,18 +26,40 @@ export default function BudgetPage() {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [editAmount, setEditAmount] = useState("");
 
+  // マウント時に API から読み込み、失敗時は localStorage にフォールバック
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      try {
-        setCategories(JSON.parse(saved));
-      } catch {}
-    }
+    fetch("/api/data/budget")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && data.categories && data.categories.length > 0) {
+          setCategories(data.categories);
+        } else {
+          const saved = localStorage.getItem(STORAGE_KEY);
+          if (saved) { try { setCategories(JSON.parse(saved)); } catch {} }
+        }
+        setLoaded(true);
+      })
+      .catch(() => {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) { try { setCategories(JSON.parse(saved)); } catch {} }
+        setLoaded(true);
+      });
   }, []);
+
+  // 状態変更時に API へ保存、失敗時は localStorage にフォールバック
+  useEffect(() => {
+    if (!loaded) return;
+    fetch("/api/data/budget", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ categories }),
+    }).catch(() => {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(categories));
+    });
+  }, [loaded, categories]);
 
   const persist = (updated: BudgetCategory[]) => {
     setCategories(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
   };
 
   const addItem = (categoryId: string) => {

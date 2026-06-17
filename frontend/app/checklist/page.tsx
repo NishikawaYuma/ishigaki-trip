@@ -71,35 +71,53 @@ const cardShadow = "0 1px 3px rgba(23,58,71,.06)";
 export default function ChecklistPage() {
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [custom, setCustom] = useState<Record<string, Item[]>>({});
-  const [mounted, setMounted] = useState(false);
+  const [loaded, setLoaded] = useState(false);
   const [addingIn, setAddingIn] = useState<string | null>(null);
   const [newLabel, setNewLabel] = useState("");
 
+  // マウント時に API から読み込み、失敗時は localStorage にフォールバック
   useEffect(() => {
-    const c = localStorage.getItem(CHECK_KEY);
-    if (c) {
-      try {
-        setChecked(new Set(JSON.parse(c)));
-      } catch {}
-    }
-    const cu = localStorage.getItem(CUSTOM_KEY);
-    if (cu) {
-      try {
-        setCustom(JSON.parse(cu));
-      } catch {}
-    }
-    setMounted(true);
+    fetch("/api/data/checklist")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data && Object.keys(data).length > 0) {
+          setChecked(new Set(data.checkedIds ?? []));
+          setCustom(data.customItems ?? {});
+        } else {
+          const c = localStorage.getItem(CHECK_KEY);
+          const cu = localStorage.getItem(CUSTOM_KEY);
+          if (c) { try { setChecked(new Set(JSON.parse(c))); } catch {} }
+          if (cu) { try { setCustom(JSON.parse(cu)); } catch {} }
+        }
+        setLoaded(true);
+      })
+      .catch(() => {
+        const c = localStorage.getItem(CHECK_KEY);
+        const cu = localStorage.getItem(CUSTOM_KEY);
+        if (c) { try { setChecked(new Set(JSON.parse(c))); } catch {} }
+        if (cu) { try { setCustom(JSON.parse(cu)); } catch {} }
+        setLoaded(true);
+      });
   }, []);
 
-  const persistChecked = (s: Set<string>) => localStorage.setItem(CHECK_KEY, JSON.stringify([...s]));
-  const persistCustom = (c: Record<string, Item[]>) => localStorage.setItem(CUSTOM_KEY, JSON.stringify(c));
+  // 状態変更時に API へ保存、失敗時は localStorage にフォールバック
+  useEffect(() => {
+    if (!loaded) return;
+    fetch("/api/data/checklist", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ checkedIds: [...checked], customItems: custom }),
+    }).catch(() => {
+      localStorage.setItem(CHECK_KEY, JSON.stringify([...checked]));
+      localStorage.setItem(CUSTOM_KEY, JSON.stringify(custom));
+    });
+  }, [loaded, checked, custom]);
 
   const toggle = (id: string) =>
     setChecked((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
-      persistChecked(next);
       return next;
     });
 
@@ -108,22 +126,18 @@ export default function ChecklistPage() {
   const addItem = (name: string) => {
     if (!newLabel.trim()) return;
     const item: Item = { id: "x-" + Math.random().toString(36).slice(2, 9), label: newLabel.trim() };
-    const updated = { ...custom, [name]: [...(custom[name] ?? []), item] };
-    setCustom(updated);
-    persistCustom(updated);
+    setCustom((prev) => ({ ...prev, [name]: [...(prev[name] ?? []), item] }));
     setNewLabel("");
     setAddingIn(null);
   };
 
   const removeCustom = (name: string, id: string) => {
-    const updated = { ...custom, [name]: (custom[name] ?? []).filter((i) => i.id !== id) };
-    setCustom(updated);
-    persistCustom(updated);
+    setCustom((prev) => ({ ...prev, [name]: (prev[name] ?? []).filter((i) => i.id !== id) }));
   };
 
   const allIds = baseCategories.flatMap((c) => itemsFor(c.name, c.items).map((i) => i.id));
   const totalCount = allIds.length;
-  const checkedCount = mounted ? allIds.filter((id) => checked.has(id)).length : 0;
+  const checkedCount = loaded ? allIds.filter((id) => checked.has(id)).length : 0;
   const pct = totalCount ? Math.round((checkedCount / totalCount) * 100) : 0;
 
   return (
@@ -153,7 +167,7 @@ export default function ChecklistPage() {
               </h2>
               <ul className="space-y-2.5">
                 {items.map((item) => {
-                  const isChecked = mounted && checked.has(item.id);
+                  const isChecked = loaded && checked.has(item.id);
                   const isCustom = customIds.has(item.id);
                   return (
                     <li key={item.id} className="flex items-center gap-2.5">
@@ -223,7 +237,6 @@ export default function ChecklistPage() {
       <button
         onClick={() => {
           setChecked(new Set());
-          localStorage.removeItem(CHECK_KEY);
         }}
         className="mt-6 w-full text-[12px] py-2"
         style={{ color: "var(--ink-400)" }}
