@@ -64,7 +64,7 @@ _db: firestore.Client | None = None
 def get_db() -> firestore.Client:
     global _db
     if _db is None:
-        _db = firestore.Client()
+        _db = firestore.Client(database="ishigaki-trip-data")
     return _db
 
 _ALLOWED_KEYS = {"checklist", "budget", "itinerary"}
