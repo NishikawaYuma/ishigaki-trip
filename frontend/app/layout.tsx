@@ -20,6 +20,7 @@ const zenMaru = Zen_Maru_Gothic({
 export const metadata: Metadata = {
   title: "石垣島 旅のしおり",
   description: "2026年6月 石垣島旅行のしおりアプリ",
+  manifest: "/manifest.json",
 };
 
 /* ★ viewport を明示。width=device-width / initial-scale=1 / viewport-fit=cover。
