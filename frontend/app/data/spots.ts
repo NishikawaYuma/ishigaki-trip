@@ -20,8 +20,8 @@ export type DayPlan = {
 
 export const tripData: DayPlan[] = [
   {
-    date: "2026-06-24",
-    label: "1日目（水）石垣島着・竹富島へ",
+    date: "2026-06-28",
+    label: "1日目（日）石垣島着・竹富島へ",
     schedules: [
       {
         id: "d1-1",
@@ -84,8 +84,8 @@ export const tripData: DayPlan[] = [
     ],
   },
   {
-    date: "2026-06-25",
-    label: "2日目（木）石垣島へ移動・観光",
+    date: "2026-06-29",
+    label: "2日目（月）石垣島へ移動・観光",
     schedules: [
       {
         id: "d2-1",
@@ -140,8 +140,8 @@ export const tripData: DayPlan[] = [
     ],
   },
   {
-    date: "2026-06-26",
-    label: "3日目（金）シュノーケリング・観光",
+    date: "2026-06-30",
+    label: "3日目（火）シュノーケリング・観光",
     schedules: [
       {
         id: "d3-1",
@@ -194,8 +194,8 @@ export const tripData: DayPlan[] = [
     ],
   },
   {
-    date: "2026-06-27",
-    label: "4日目（土）西表島・石垣観光",
+    date: "2026-07-01",
+    label: "4日目（水）西表島・石垣観光",
     schedules: [
       {
         id: "d4-1",
@@ -226,8 +226,8 @@ export const tripData: DayPlan[] = [
     ],
   },
   {
-    date: "2026-06-28",
-    label: "5日目（日）帰路",
+    date: "2026-07-02",
+    label: "5日目（木）帰路",
     schedules: [
       {
         id: "d5-1",
